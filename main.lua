@@ -27,12 +27,27 @@ function _init()
     pal({8,9,2,12})
     y=-10
     make_map()
+    
+    -- dummy code for block falling
+    target = {}
+    target.x = 0
+    target.y = 0
 end
 
 function _update60()
-    if (btn(2)) y -= 1
-    if (btn(3)) y += 1
+    if (btnp(0)) target.x -= 1
+    if (btnp(1)) target.x += 1
+    if (btnp(2)) target.y -= 1
+    if (btnp(3)) target.y += 1
+    if (btnp(4)) kill(target.x, target.y)
+    
+    local deltay = target.y*10 - y - 30
+    y += deltay/10
+    if (abs(deltay) < 1) y = target.y*10 - 30
+
 end
+
+
 
 function _draw()
     camera(0,y)
@@ -48,5 +63,6 @@ function _draw()
             if ((n\16) < 2) line(xb, yb, xb+12, yb, 0)
         end
     end
+    print("x",(target.x*12)+5,(target.y*10)+3, 7)
 end
 
