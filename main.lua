@@ -3,7 +3,7 @@ function mg(x,y)
 end
 
 function make_map()
-    for x = 0,7,1 do
+    for x = 0,8,1 do
         for y = 0,99,1 do
             n = 1+rnd(4)\1
             if (n == mg(x-1,y)) n+=16
@@ -23,8 +23,8 @@ function kill(x,y)
 end
 
 function _init()
-    poke(0x5f57,8) -- set map to 8 width
-    pal({8,9,10,12})
+    poke(0x5f57,9) -- set map to 8 width
+    pal({8,9,2,12})
     y=-10
     make_map()
 end
@@ -36,11 +36,16 @@ end
 
 function _draw()
     camera(0,y)
-    local ystart = y\12
-    for yy=ystart,ystart+12,1 do
-        for xx=0,7,1 do
-            n = mg(xx,yy)
-            rectfill(xx*16,yy*12,(xx+1)*16,(yy+1)*12,n)
+    cls()
+    local ystart = y\10
+    for yy=ystart,ystart+13,1 do
+        for xx=0,8,1 do
+            n = mget(xx,yy)
+            local xb = xx*12
+            local yb = yy*10
+            rectfill(xb, yb, xb + 12, yb + 10, n)
+            if ((n\16)%2 == 0) line(xb, yb, xb, yb+10, 0)
+            if ((n\16) < 2) line(xb, yb, xb+12, yb, 0)
         end
     end
 end
