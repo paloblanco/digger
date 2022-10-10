@@ -34,12 +34,17 @@ function _init()
     target.y = 0
 end
 
-function _update60()
+function turn()
     if (btnp(0)) target.x -= 1
     if (btnp(1)) target.x += 1
     if (btnp(2)) target.y -= 1
     if (btnp(3)) target.y += 1
     if (btnp(4)) kill(target.x, target.y)
+
+end
+
+function _update60()
+    if (btnp()>0) turn()
     
     local deltay = target.y*10 - y - 30
     y += deltay/10
