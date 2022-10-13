@@ -1,5 +1,89 @@
+-- thing code
+
+thing = {}
+
+function thing:init()
+end
+
+function thing:new(o)
+    local o=o or {}
+    local t={}
+    for k,v in pairs(self) do
+        if type(v) == "table" then
+            newt = {}
+            for kk,vv in pairs(v) do
+                newt[kk]=vv
+            end
+            t[k]=newt
+        else
+            t[k] = v
+        end
+    end
+    for k,v in pairs(o) do
+        t[k] = v
+    end
+    setmetatable(t,self)
+    self.__index=self
+    t:init()
+    return t
+end
+
+-- clusters
+
+-- all_clusters = {} -- added to init
+
+cluster = thing:new()
+cluster.x0=0
+cluster.y0=0
+
+function cluster:init()
+    self.blocks = {}
+    self.color = mg(self.x0,self.y0)
+    self:add_blocks(self.x0,self.y0)
+    self:add_to_global_table()
+end
+
+function cluster:add_blocks(x,y)
+    for each in all(self.blocks) do
+        if blockid(x,y) == each then
+            return
+        end
+    end
+    add(self.blocks,blockid(x,y))
+    for each in all({{-1,0},{1,0},{0,-1},{0,1}}) do
+        local xx=each[1] + x
+        local yy=each[2] + y
+        if mg(xx,yy) == self.color then
+            -- print("adding block "..xx.." "..yy)
+            -- flip()
+            self:add_blocks(xx,yy)
+        end
+    end
+end
+
+function cluster:add_to_global_table()
+    for each in all(self.blocks) do
+        all_clusters[each]=self
+    end
+end
+
+function cluster:highlight()
+    for ix in all(self.blocks) do
+        xx,yy = blockcoord(ix)
+        rectfill(xx*12,yy*10,xx*12+12,yy*10+10,7) 
+    end
+end
+
 function mg(x,y)
     return mget(x,y)%16
+end
+
+function blockid(x,y)
+    return x + 9*y
+end
+
+function blockcoord(id)
+    return id%9,(id\9)
 end
 
 function make_map()
@@ -9,6 +93,16 @@ function make_map()
             if (n == mg(x-1,y)) n+=16
             if (n%16 == mg(x,y-1)) n+=32
             mset(x,y,n)
+        end
+    end
+    all_clusters = {}
+    for xx = 0,8,1 do
+        for yy = 0,99,1 do
+            if not all_clusters[blockid(xx,yy)] then
+                -- print("newcluster")
+                -- flip()
+                cluster:new{x0=xx,y0=yy} 
+            end
         end
     end
 end
@@ -25,7 +119,7 @@ end
 function _init()
     poke(0x5f57,9) -- set map to 8 width
     pal({8,9,2,12})
-    y=-10
+    cy=-10
     make_map()
     
     -- dummy code for block falling
@@ -46,18 +140,18 @@ end
 function _update60()
     if (btnp()>0) turn()
     
-    local deltay = target.y*10 - y - 30
-    y += deltay/10
-    if (abs(deltay) < 1) y = target.y*10 - 30
+    local deltay = target.y*10 - cy - 30
+    cy += deltay/10
+    if (abs(deltay) < 1) cy = target.y*10 - 30
 
 end
 
 
 
 function _draw()
-    camera(0,y)
+    camera(0,cy)
     cls()
-    local ystart = y\10
+    local ystart = cy\10
     for yy=ystart,ystart+13,1 do
         for xx=0,8,1 do
             n = mget(xx,yy)
@@ -68,6 +162,8 @@ function _draw()
             if ((n\16) < 2) line(xb, yb, xb+12, yb, 0)
         end
     end
-    print("x",(target.x*12)+5,(target.y*10)+3, 7)
+    cluster_now = all_clusters[blockid(target.x,target.y)]
+    cluster_now:highlight()
+    print("x",(target.x*12)+5,(target.y*10)+3, 1)
 end
 
