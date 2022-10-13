@@ -28,6 +28,12 @@ function thing:new(o)
     return t
 end
 
+function contains(t,v)
+    for _,each in pairs(t) do
+        if (each==v) return true
+    end
+    return false
+end
 -- clusters
 
 -- all_clusters = {} -- added to init
@@ -41,14 +47,12 @@ function cluster:init()
     self.color = mg(self.x0,self.y0)
     self:add_blocks(self.x0,self.y0)
     self:add_to_global_table()
+    self.aboveme = {}
+    self.belowme = {}
 end
 
 function cluster:add_blocks(x,y)
-    for each in all(self.blocks) do
-        if blockid(x,y) == each then
-            return
-        end
-    end
+    if (contains(self.blocks,blockid(x,y))) return
     add(self.blocks,blockid(x,y))
     for each in all({{-1,0},{1,0},{0,-1},{0,1}}) do
         local xx=each[1] + x
@@ -67,10 +71,29 @@ function cluster:add_to_global_table()
     end
 end
 
-function cluster:highlight()
+function cluster:highlight(cc)
+    cc = cc or 7
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
-        rectfill(xx*12,yy*10,xx*12+12,yy*10+10,7) 
+        rectfill(xx*12,yy*10,xx*12+12,yy*10+10,cc) 
+    end
+end
+
+function cluster:add_support(other)
+    add(self.belowme,other)
+    add(other.aboveme,self)
+end
+
+function cluster:check_supports()
+    for ix in all(self.blocks) do
+        xx,yy = blockcoord(ix)
+        if yy < 99 and mg(xx,yy+1) != self.color then
+            local oix = blockid(xx,yy+1)
+            other = all_clusters[oix]
+            if not contains(self.belowme,other) then
+                self:add_support(other)
+            end
+        end
     end
 end
 
@@ -86,6 +109,23 @@ function blockcoord(id)
     return id%9,(id\9)
 end
 
+function link_clusters()
+    for _,c in pairs(all_clusters) do
+        c:check_supports()
+    end
+end
+
+function make_clusters()
+    all_clusters = {}
+    for xx = 0,8,1 do
+        for yy = 0,99,1 do
+            if not all_clusters[blockid(xx,yy)] then
+                cluster:new{x0=xx,y0=yy} 
+            end
+        end
+    end
+end
+
 function make_map()
     for x = 0,8,1 do
         for y = 0,99,1 do
@@ -93,16 +133,6 @@ function make_map()
             if (n == mg(x-1,y)) n+=16
             if (n%16 == mg(x,y-1)) n+=32
             mset(x,y,n)
-        end
-    end
-    all_clusters = {}
-    for xx = 0,8,1 do
-        for yy = 0,99,1 do
-            if not all_clusters[blockid(xx,yy)] then
-                -- print("newcluster")
-                -- flip()
-                cluster:new{x0=xx,y0=yy} 
-            end
         end
     end
 end
@@ -121,7 +151,8 @@ function _init()
     pal({8,9,2,12})
     cy=-10
     make_map()
-    
+    make_clusters()
+    link_clusters()
     -- dummy code for block falling
     target = {}
     target.x = 0
@@ -163,7 +194,13 @@ function _draw()
         end
     end
     cluster_now = all_clusters[blockid(target.x,target.y)]
-    cluster_now:highlight()
+    cluster_now:highlight(7)
+    for b in all(cluster_now.belowme) do
+        b:highlight(15)
+    end
+    for b in all(cluster_now.aboveme) do
+        b:highlight(14)
+    end
     print("x",(target.x*12)+5,(target.y*10)+3, 1)
 end
 
