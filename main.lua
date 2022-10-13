@@ -49,6 +49,28 @@ function cluster:init()
     self:add_to_global_table()
     self.aboveme = {}
     self.belowme = {}
+    self.stable = true
+    self.timer = 2
+end
+
+function cluster:check_stable()
+    if #self.belowme < 1 then
+        self.stable = false
+        for b in all(self.aboveme) do
+            b:check_stable()
+        end
+    else 
+        local stable = false
+        for each in all(self.belowme) do
+            if (each.stable) stable=true
+        end
+        if not stable then
+            self.stable = false
+            for b in all(self.aboveme) do
+                b:check_stable()
+            end
+        end
+    end
 end
 
 function cluster:add_blocks(x,y)
@@ -58,8 +80,6 @@ function cluster:add_blocks(x,y)
         local xx=each[1] + x
         local yy=each[2] + y
         if mg(xx,yy) == self.color then
-            -- print("adding block "..xx.." "..yy)
-            -- flip()
             self:add_blocks(xx,yy)
         end
     end
@@ -105,6 +125,7 @@ function cluster:killme()
     end
     for b in all(self.aboveme) do
         del(b.belowme,self)
+        b:check_stable()
     end
     for b in all(self.belowme) do
         del(b.aboveme,self)
@@ -178,7 +199,10 @@ function turn()
     if (btnp(1)) target.x += 1
     if (btnp(2)) target.y -= 1
     if (btnp(3)) target.y += 1
-    if (btnp(4)) kill(target.x, target.y)
+    if (btnp(4)) then
+        local ix = blockid(target.x,target.y)
+        all_clusters[ix]:killme()
+    end
 
 end
 
@@ -189,6 +213,14 @@ function _update60()
     if (abs(deltay) < 1) cy = target.y*10 - 30
 end
 
+function get_cluster_xy(x,y)
+    local ix = blockid(x,y)
+    return get_cluster_ix(ix)
+end
+
+function get_cluster_ix(ix)
+    return all_clusters[ix] or false
+end
 
 function _draw()
     camera(0,cy)
@@ -202,6 +234,10 @@ function _draw()
             rectfill(xb, yb, xb + 12, yb + 10, n)
             if ((n\16)%2 == 0) line(xb, yb, xb, yb+10, 0)
             if ((n\16) < 2) line(xb, yb, xb+12, yb, 0)
+            local clust = get_cluster_xy(xx,yy)
+            if clust and not clust.stable then
+                if (60*t()%12<6) clust:highlight(6)
+            end
         end
     end
     cluster_now = all_clusters[blockid(target.x,target.y)]
