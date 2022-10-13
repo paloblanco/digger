@@ -97,6 +97,20 @@ function cluster:check_supports()
     end
 end
 
+function cluster:killme()
+    for ix in all(self.blocks) do
+        xx,yy = blockcoord(ix)
+        mset(xx,yy,0)
+        all_clusters[ix] = false
+    end
+    for b in all(self.aboveme) do
+        del(b.belowme,self)
+    end
+    for b in all(self.belowme) do
+        del(b.aboveme,self)
+    end
+end
+
 function mg(x,y)
     return mget(x,y)%16
 end
@@ -170,13 +184,10 @@ end
 
 function _update60()
     if (btnp()>0) turn()
-    
     local deltay = target.y*10 - cy - 30
     cy += deltay/10
     if (abs(deltay) < 1) cy = target.y*10 - 30
-
 end
-
 
 
 function _draw()
@@ -194,12 +205,14 @@ function _draw()
         end
     end
     cluster_now = all_clusters[blockid(target.x,target.y)]
-    cluster_now:highlight(7)
-    for b in all(cluster_now.belowme) do
-        b:highlight(15)
-    end
-    for b in all(cluster_now.aboveme) do
-        b:highlight(14)
+    if cluster_now then
+        cluster_now:highlight(7)
+        for b in all(cluster_now.belowme) do
+            b:highlight(15)
+        end
+        for b in all(cluster_now.aboveme) do
+            b:highlight(14)
+        end
     end
     print("x",(target.x*12)+5,(target.y*10)+3, 1)
 end
