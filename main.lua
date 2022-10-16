@@ -36,7 +36,7 @@ function contains(t,v)
 end
 -- clusters
 
--- all_clusters = {} -- added to init
+-- map_clusters = {} -- added to init
 
 cluster = thing:new()
 cluster.x0=0
@@ -87,8 +87,9 @@ end
 
 function cluster:add_to_global_table()
     for each in all(self.blocks) do
-        all_clusters[each]=self
+        map_clusters[each]=self
     end
+    add(list_clusters,self)
 end
 
 function cluster:highlight(cc)
@@ -109,7 +110,7 @@ function cluster:check_supports()
         xx,yy = blockcoord(ix)
         if yy < 99 and mg(xx,yy+1) != self.color then
             local oix = blockid(xx,yy+1)
-            other = all_clusters[oix]
+            other = map_clusters[oix]
             if not contains(self.belowme,other) then
                 self:add_support(other)
             end
@@ -121,7 +122,7 @@ function cluster:killme()
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
         mset(xx,yy,0)
-        all_clusters[ix] = false
+        map_clusters[ix] = false
     end
     for b in all(self.aboveme) do
         del(b.belowme,self)
@@ -130,6 +131,7 @@ function cluster:killme()
     for b in all(self.belowme) do
         del(b.aboveme,self)
     end
+    del(list_clusters,self)
 end
 
 function mg(x,y)
@@ -145,16 +147,17 @@ function blockcoord(id)
 end
 
 function link_clusters()
-    for _,c in pairs(all_clusters) do
+    for _,c in pairs(map_clusters) do
         c:check_supports()
     end
 end
 
 function make_clusters()
-    all_clusters = {}
+    map_clusters = {} -- clusters indexed by id. has repeats
+    list_clusters = {} -- clusters in a sequential list. no repeats.
     for xx = 0,8,1 do
         for yy = 0,99,1 do
-            if not all_clusters[blockid(xx,yy)] then
+            if not map_clusters[blockid(xx,yy)] then
                 cluster:new{x0=xx,y0=yy} 
             end
         end
@@ -201,9 +204,8 @@ function turn()
     if (btnp(3)) target.y += 1
     if (btnp(4)) then
         local ix = blockid(target.x,target.y)
-        all_clusters[ix]:killme()
+        map_clusters[ix]:killme()
     end
-
 end
 
 function _update60()
@@ -219,7 +221,7 @@ function get_cluster_xy(x,y)
 end
 
 function get_cluster_ix(ix)
-    return all_clusters[ix] or false
+    return map_clusters[ix] or false
 end
 
 function _draw()
@@ -236,11 +238,11 @@ function _draw()
             if ((n\16) < 2) line(xb, yb, xb+12, yb, 0)
             local clust = get_cluster_xy(xx,yy)
             if clust and not clust.stable then
-                if (60*t()%12<6) clust:highlight(6)
+                if (60*t()%24<12) clust:highlight(0)
             end
         end
     end
-    cluster_now = all_clusters[blockid(target.x,target.y)]
+    cluster_now = map_clusters[blockid(target.x,target.y)]
     if cluster_now then
         cluster_now:highlight(7)
         for b in all(cluster_now.belowme) do
