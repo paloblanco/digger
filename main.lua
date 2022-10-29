@@ -50,19 +50,22 @@ function cluster:init()
     self.aboveme = {}
     self.belowme = {}
     self.stable = true
+    self.calling = false -- true if currently checking stability
+    self.dependent = false
     self.timer = 2
 end
 
 function cluster:check_stable()
+    --self.calling = true -- this only gets called once a cluster
+    if (not self.stable) return
     if #self.belowme < 1 then
         self.stable = false
-        for b in all(self.aboveme) do
-            b:check_stable()
-        end
     else 
         local stable = false
         for each in all(self.belowme) do
-            if (each.stable) stable=true
+            if (each.stable) then
+                stable=true
+            end
         end
         if not stable then
             self.stable = false
@@ -118,6 +121,14 @@ function cluster:check_supports()
     end
 end
 
+function cluster:remove_loop_supports()
+    for c in all(self.belowme) do
+        if #c.belowme == 1 and contains(c.belowme,self) then
+            del(self.belowme,c)
+        end
+    end
+end
+
 function cluster:killme()
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
@@ -126,6 +137,7 @@ function cluster:killme()
     end
     for b in all(self.aboveme) do
         del(b.belowme,self)
+        del(b.aboveme,self) -- ugly fix for infinite loop
         b:check_stable()
     end
     for b in all(self.belowme) do
@@ -149,6 +161,9 @@ end
 function link_clusters()
     for _,c in pairs(map_clusters) do
         c:check_supports()
+    end
+    for _,c in pairs(map_clusters) do
+        c:remove_loop_supports()
     end
 end
 
@@ -204,7 +219,10 @@ function turn()
     if (btnp(3)) target.y += 1
     if (btnp(4)) then
         local ix = blockid(target.x,target.y)
-        map_clusters[ix]:killme()
+        if (map_clusters[ix]) map_clusters[ix]:killme()
+    end
+    for c in all(list_clusters) do
+        c.calling = false
     end
 end
 
