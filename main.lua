@@ -51,29 +51,44 @@ function cluster:init()
     self.belowme = {}
     self.stable = true
     self.calling = false -- true if currently checking stability
-    self.dependent = false
+    self.confirmed = true -- have I confirmed recently that you are stable?
     self.timer = 2
 end
 
 function cluster:check_stable()
-    --self.calling = true -- this only gets called once a cluster
-    if (not self.stable) return
-    if #self.belowme < 1 then
-        self.stable = false
-    else 
-        local stable = false
-        for each in all(self.belowme) do
-            if (each.stable) then
-                stable=true
-            end
-        end
-        if not stable then
-            self.stable = false
-            for b in all(self.aboveme) do
-                b:check_stable()
-            end
+    printh("checking stable")
+    local stable = false
+    self.calling=true -- flag the first time I am checked
+    self:highlight()
+    flip()
+    for each in all(self.belowme) do
+        if each.calling then
+            do end -- break out of a circular reference
+        elseif (each.confirmed and each.stable) or each.color==5 then
+            stable = true
+            self.stable=true
+            self:set_confirmed(true)
+            printh("true")
+            return true
+        -- else
+        --     stable = each:check_stable()
+        --     if stable then
+        --         self.stable=true
+        --         self:set_confirmed(true)
+        --         return true
+        --     end
         end
     end
+
+    if not stable then
+        printh("was not stable")
+        for each in all(self.aboveme) do
+            if ((not each.confirmed) and (not each.calling)) each:check_stable()
+        end
+    end
+
+    self.stable=stable
+    return self.stable
 end
 
 function cluster:add_blocks(x,y)
@@ -104,8 +119,8 @@ function cluster:highlight(cc)
 end
 
 function cluster:add_support(other)
-    add(self.belowme,other)
-    add(other.aboveme,self)
+    if (not contains(self.belowme,other)) add(self.belowme,other)
+    if (not contains(other.aboveme,self)) add(other.aboveme,self)
 end
 
 function cluster:check_supports()
@@ -129,6 +144,17 @@ function cluster:remove_loop_supports()
     end
 end
 
+function cluster:set_confirmed(f)
+    printh("confirming")
+    f = f or false
+    self:highlight(5)
+    flip()
+    self.confirmed = f
+    for c in all(self.aboveme) do
+        if (c.confirmed != f) c:set_confirmed(f)
+    end
+end
+
 function cluster:killme()
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
@@ -137,11 +163,13 @@ function cluster:killme()
     end
     for b in all(self.aboveme) do
         del(b.belowme,self)
-        del(b.aboveme,self) -- ugly fix for infinite loop
-        b:check_stable()
+        b:set_confirmed(false)
     end
     for b in all(self.belowme) do
         del(b.aboveme,self)
+    end
+    for b in all(self.aboveme) do
+        b:check_stable()
     end
     del(list_clusters,self)
 end
@@ -162,9 +190,6 @@ function link_clusters()
     for _,c in pairs(map_clusters) do
         c:check_supports()
     end
-    for _,c in pairs(map_clusters) do
-        c:remove_loop_supports()
-    end
 end
 
 function make_clusters()
@@ -180,14 +205,19 @@ function make_clusters()
 end
 
 function make_map()
-    for x = 0,8,1 do
-        for y = 0,99,1 do
+    for y = 0,99,1 do
+        for x = 0,8,1 do
             n = 1+rnd(4)\1
             if (n == mg(x-1,y)) n+=16
             if (n%16 == mg(x,y-1)) n+=32
             mset(x,y,n)
         end
     end
+    y=100
+    for x = 0,8,1 do
+        mset(x,y,5)
+    end
+
 end
 
 function kill(x,y)
@@ -218,11 +248,13 @@ function turn()
     if (btnp(2)) target.y -= 1
     if (btnp(3)) target.y += 1
     if (btnp(4)) then
+        printh("==========KILL========")
         local ix = blockid(target.x,target.y)
         if (map_clusters[ix]) map_clusters[ix]:killme()
     end
-    for c in all(list_clusters) do
-        c.calling = false
+    for each in all(list_clusters) do
+        each.confirmed=true
+        each.calling=false
     end
 end
 
