@@ -36,7 +36,7 @@ function contains(t,v)
 end
 -- clusters
 
--- map_clusters = {} -- added to init
+
 
 cluster = thing:new()
 cluster.x0=0
@@ -51,6 +51,7 @@ function cluster:init()
     self.belowme = {}
     self.stable = true
     self.calling = false -- true if currently checking stability
+    self.falling = false
     self.confirmed = true -- have I confirmed recently that you are stable?
     self.timer = 2
 end
@@ -58,8 +59,6 @@ end
 function cluster:check_stable()
     local stable = false
     self.calling=true -- flag the first time I am checked
-    -- self:highlight()
-    -- flip()
     for each in all(self.belowme) do
         if each.calling then
             do end -- break out of a circular reference
@@ -67,13 +66,11 @@ function cluster:check_stable()
             stable = true
             self.stable=true
             self:set_confirmed(true)
-            -- printh("true")
             return true
         end
     end
 
     if not stable then
-        -- printh("was not stable")
         for each in all(self.aboveme) do
             if ((not each.confirmed) and (not each.calling)) each:check_stable()
         end
@@ -118,11 +115,16 @@ end
 function cluster:check_supports()
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
-        if yy < 100 and mg(xx,yy+1) != self.color then
+        -- if yy < 100 and mg(xx,yy+1) != self.color then
+        if yy < 100 and map_clusters[ix+9] != self then
             local oix = blockid(xx,yy+1)
             other = map_clusters[oix]
-            if not contains(self.belowme,other) then
+            if other and not contains(self.belowme,other) then
                 self:add_support(other)
+                if other.stable then
+                    self.falling=false
+                    self.stable=true
+                end
             end
         end
     end
@@ -163,6 +165,33 @@ function cluster:killme()
     del(list_clusters,self)
 end
 
+function cluster:set_stable()
+    self.stable=true
+    self.falling=false
+    for a in all(self.aboveme) do
+        if (not a.stable) a:set_stable()
+    end
+end
+
+function cluster:fall()
+    local old_blocks = {}
+    for ix,bix in pairs(self.blocks) do
+        bixnew = bix+9
+        self.blocks[ix] = bixnew
+        add(old_blocks,bix)
+        xx,yy = blockcoord(bixnew)
+        mset(xx,yy,self.color)
+        map_clusters[bixnew] = self
+    end
+    for b in all(old_blocks) do
+        if (not contains(self.blocks,b) and (map_clusters[b] == self)) then
+            map_clusters[b] = false
+            xx,yy = blockcoord(b)
+            mset(xx,yy,0)
+        end
+    end
+end
+
 function mg(x,y)
     return mget(x,y)%16
 end
@@ -197,8 +226,8 @@ function make_map()
     for y = 0,99,1 do
         for x = 0,8,1 do
             n = 1+rnd(4)\1
-            if (n == mg(x-1,y)) n+=16
-            if (n%16 == mg(x,y-1)) n+=32
+            -- if (n == mg(x-1,y)) n+=16
+            -- if (n%16 == mg(x,y-1)) n+=32
             mset(x,y,n)
         end
     end
@@ -206,7 +235,17 @@ function make_map()
     for x = 0,8,1 do
         mset(x,y,5)
     end
+end
 
+function fix_map_tiling()
+    for y = 0,100,1 do
+        for x = 0,8,1 do
+            n = mg(x,y)
+            if (n == mg(x-1,y)) n+=16
+            if (n%16 == mg(x,y-1)) n+=32
+            mset(x,y,n)
+        end
+    end
 end
 
 function kill(x,y)
@@ -223,6 +262,7 @@ function _init()
     pal({8,9,2,12})
     cy=-10
     make_map()
+    fix_map_tiling()
     make_clusters()
     link_clusters()
     -- dummy code for block falling
@@ -240,10 +280,23 @@ function turn()
         local ix = blockid(target.x,target.y)
         if (map_clusters[ix]) map_clusters[ix]:killme()
     end
+    local fallcheck = {}
     for each in all(list_clusters) do
         each.confirmed=true
         each.calling=false
+        if each.falling then
+            each:fall()
+            add(fallcheck,each)
+        elseif (not each.stable) and (not each.falling) then
+            each.falling = true
+        end
     end
+    for each in all(fallcheck) do
+        each:check_supports()
+        if (each.stable) each:set_stable()
+    end
+    fallcheck=nil
+    fix_map_tiling()
 end
 
 function _update60()
