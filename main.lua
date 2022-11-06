@@ -56,11 +56,10 @@ function cluster:init()
 end
 
 function cluster:check_stable()
-    printh("checking stable")
     local stable = false
     self.calling=true -- flag the first time I am checked
-    self:highlight()
-    flip()
+    -- self:highlight()
+    -- flip()
     for each in all(self.belowme) do
         if each.calling then
             do end -- break out of a circular reference
@@ -68,20 +67,13 @@ function cluster:check_stable()
             stable = true
             self.stable=true
             self:set_confirmed(true)
-            printh("true")
+            -- printh("true")
             return true
-        -- else
-        --     stable = each:check_stable()
-        --     if stable then
-        --         self.stable=true
-        --         self:set_confirmed(true)
-        --         return true
-        --     end
         end
     end
 
     if not stable then
-        printh("was not stable")
+        -- printh("was not stable")
         for each in all(self.aboveme) do
             if ((not each.confirmed) and (not each.calling)) each:check_stable()
         end
@@ -126,7 +118,7 @@ end
 function cluster:check_supports()
     for ix in all(self.blocks) do
         xx,yy = blockcoord(ix)
-        if yy < 99 and mg(xx,yy+1) != self.color then
+        if yy < 100 and mg(xx,yy+1) != self.color then
             local oix = blockid(xx,yy+1)
             other = map_clusters[oix]
             if not contains(self.belowme,other) then
@@ -145,10 +137,7 @@ function cluster:remove_loop_supports()
 end
 
 function cluster:set_confirmed(f)
-    printh("confirming")
     f = f or false
-    self:highlight(5)
-    flip()
     self.confirmed = f
     for c in all(self.aboveme) do
         if (c.confirmed != f) c:set_confirmed(f)
@@ -196,7 +185,7 @@ function make_clusters()
     map_clusters = {} -- clusters indexed by id. has repeats
     list_clusters = {} -- clusters in a sequential list. no repeats.
     for xx = 0,8,1 do
-        for yy = 0,99,1 do
+        for yy = 0,100,1 do
             if not map_clusters[blockid(xx,yy)] then
                 cluster:new{x0=xx,y0=yy} 
             end
@@ -248,7 +237,6 @@ function turn()
     if (btnp(2)) target.y -= 1
     if (btnp(3)) target.y += 1
     if (btnp(4)) then
-        printh("==========KILL========")
         local ix = blockid(target.x,target.y)
         if (map_clusters[ix]) map_clusters[ix]:killme()
     end
