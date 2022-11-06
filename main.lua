@@ -108,6 +108,7 @@ function cluster:highlight(cc)
 end
 
 function cluster:add_support(other)
+    if (other==self) return
     if (not contains(self.belowme,other)) add(self.belowme,other)
     if (not contains(other.aboveme,self)) add(other.aboveme,self)
 end
@@ -190,6 +191,32 @@ function cluster:fall()
             mset(xx,yy,0)
         end
     end
+end
+
+function cluster:check_and_merge_below()
+    for b in all(self.belowme) do
+        if b.color==self.color then
+            self:merge(b)
+        end
+    end
+end
+
+function cluster:merge(other)
+    for e in all(other.aboveme) do
+        e:add_support(self)
+        del(other.belowme,other)
+    end
+    for e in all(other.belowme) do
+        self:add_support(e)
+        del(other.aboveme,other)
+    end
+    for ix in all(other.blocks) do
+        add(self.blocks,ix)
+        map_clusters[ix]=self
+    end
+    del(self.belowme,other)
+    del(self.aboveme,other)
+    del(list_clusters,other)
 end
 
 function mg(x,y)
@@ -293,7 +320,10 @@ function turn()
     end
     for each in all(fallcheck) do
         each:check_supports()
-        if (each.stable) each:set_stable()
+        if each.stable then 
+            each:set_stable()
+            each:check_and_merge_below()
+        end
     end
     fallcheck=nil
     fix_map_tiling()
