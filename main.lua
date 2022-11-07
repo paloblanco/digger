@@ -174,6 +174,20 @@ function cluster:set_stable()
     end
 end
 
+function cluster:check_lateral()
+    for ix in all(self.blocks) do
+        xx,yy = blockcoord(ix)
+        right = map_clusters[ix+1]
+        if xx < 8 and right != self and right then
+            if (right.color == self.color) self:merge(right)
+        end
+        left = map_clusters[ix-1]
+        if xx>0 and left != self and left then
+            if (left.color == self.color) self:merge(left)
+        end
+    end
+end
+
 function cluster:fall()
     local old_blocks = {}
     for ix,bix in pairs(self.blocks) do
@@ -191,6 +205,13 @@ function cluster:fall()
             mset(xx,yy,0)
         end
     end
+    -- kill parents if they don't move
+    for e in all(self.aboveme) do
+        if not e.falling then
+            del(self.aboveme,e)
+            del(e.belowme,self)
+        end
+    end
 end
 
 function cluster:check_and_merge_below()
@@ -204,11 +225,11 @@ end
 function cluster:merge(other)
     for e in all(other.aboveme) do
         e:add_support(self)
-        del(other.belowme,other)
+        del(e.belowme,other)
     end
     for e in all(other.belowme) do
         self:add_support(e)
-        del(other.aboveme,other)
+        del(e.aboveme,other)
     end
     for ix in all(other.blocks) do
         add(self.blocks,ix)
@@ -217,6 +238,10 @@ function cluster:merge(other)
     del(self.belowme,other)
     del(self.aboveme,other)
     del(list_clusters,other)
+    if other.stable then
+        self.stable=true
+        self.falling=false
+    end
 end
 
 function mg(x,y)
@@ -253,8 +278,6 @@ function make_map()
     for y = 0,99,1 do
         for x = 0,8,1 do
             n = 1+rnd(4)\1
-            -- if (n == mg(x-1,y)) n+=16
-            -- if (n%16 == mg(x,y-1)) n+=32
             mset(x,y,n)
         end
     end
@@ -320,6 +343,7 @@ function turn()
     end
     for each in all(fallcheck) do
         each:check_supports()
+        each:check_lateral()
         if each.stable then 
             each:set_stable()
             each:check_and_merge_below()
